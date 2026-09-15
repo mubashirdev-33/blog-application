@@ -1,57 +1,76 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import Input from '../../components/Input'
-import {  signInWithEmailAndPassword } from "firebase/auth";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import Input from "../../components/Input";
+import {
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} from "firebase/auth";
 import { auth } from "../../firebase/config.js";
-import { ToastContainer,toast } from 'react-toastify';
+import { ToastContainer, toast } from "react-toastify";
+import { saveData } from "./SignUP.jsx";
+import Navbar from "../../components/Navbar.jsx";
 
 const Login = () => {
-const [form ,setForm]=useState({
-  email:"",
-password:"",
-})
-const navigate =useNavigate()
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+  });
+  const navigate = useNavigate();
   const handleInputChange = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
-const loginHandler =async()=>{
-   if ( !form.email.trim() || !form.password.trim()) {
+  const loginHandler = async () => {
+    if (!form.email.trim() || !form.password.trim()) {
       return toast.error("Please fill all fields");
     }
- try {
-  const response = await signInWithEmailAndPassword(auth, form.email, form.password)
-  if (response.user) {
-    toast.success("Login successfully")
-    setTimeout(() => {
-    navigate("/")
-    }, 2000);
-  }
- } catch (error) {
-  
+    try {
+      const response = await signInWithEmailAndPassword(
+        auth,
+        form.email,
+        form.password,
+      );
+      if (response.user) {
+        toast.success("Login successfully");
+        setTimeout(() => {
+          navigate("/");
+        }, 2000);
+      }
+    } catch (error) {
       if (
         error.message == "Firebase: Error (auth/invalid-credential)." ||
         error.code == "auth/invalid-credential"
       ) {
-       return toast.error("Invalid Credentials!");
+        return toast.error("Invalid Credentials!");
       }
- }
-
- 
-}
+    }
+  };
+  const signupWithGoogleHandler = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      let response = await signInWithPopup(auth, provider);
+      if (response.user) {
+        saveData("", response.user);
+        toast.success("Login successfully!");
+        setTimeout(() => {
+          navigate("/");
+        }, 2000);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
+  <>
+  <Navbar/>
+   <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-
         {/* Heading */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">
-            Welcome Back
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-800">Welcome Back</h1>
 
-          <p className="text-gray-500 mt-2">
-            Login to your blog account
-          </p>
+          <p className="text-gray-500 mt-2">Login to your blog account</p>
         </div>
 
         {/* Email */}
@@ -59,9 +78,13 @@ const loginHandler =async()=>{
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
           </label>
-          <Input type={"email"} placeholder={"Enter your email"} name={"email"}
-handler={handleInputChange} value={form.username}/>
-
+          <Input
+            type={"email"}
+            placeholder={"Enter your email"}
+            name={"email"}
+            handler={handleInputChange}
+            value={form.username}
+          />
         </div>
 
         {/* Password */}
@@ -69,9 +92,13 @@ handler={handleInputChange} value={form.username}/>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Password
           </label>
-          <Input type={"password"} placeholder={"Enter your password"} name={"password"}
-handler={handleInputChange} value={form.username} />
-
+          <Input
+            type={"password"}
+            placeholder={"Enter your password"}
+            name={"password"}
+            handler={handleInputChange}
+            value={form.username}
+          />
         </div>
 
         {/* Forgot Password */}
@@ -84,8 +111,18 @@ handler={handleInputChange} value={form.username} />
           </button>
         </div>
 
+{/* google */}
+<button onClick={signupWithGoogleHandler}
+          type="button"
+          className="w-full mb-3  cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition"
+          
+        >
+         Login with Google
+        </button>
+
         {/* Login */}
-        <button onClick={loginHandler}
+        <button
+          onClick={loginHandler}
           type="button"
           className="w-full cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition"
         >
@@ -104,10 +141,10 @@ handler={handleInputChange} value={form.username} />
             </button>
           </Link>
         </p>
-<ToastContainer/>
+        <ToastContainer />
       </div>
-    </div>
-  )
-}
+    </div></> 
+  );
+};
 
-export default Login
+export default Login;
