@@ -1,29 +1,27 @@
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { useState } from "react";
 import Input from "../../components/Input";
 import { ToastContainer, toast } from "react-toastify";
-import { data, Link, useNavigate } from "react-router-dom";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { Link, useNavigate } from "react-router-dom";
 import { auth, db } from "../../firebase/config.js";
-import {  doc, setDoc  } from "firebase/firestore"; 
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
-
-export const saveData =async (name="",data) => {
+export const saveData = async (name = "", data) => {
   try {
- await setDoc(doc(db, "users",data.uid), {
-   email : data.email,
-   
-   name:data.displayName ? data.displayName :name,
-   photoURL:data.photoURL ? data.photoURL : ""
-  });
-
-} catch (error) {
-toast.error(error.message)
-}
-}
-
-
-
+    await setDoc(doc(db, "users", data.uid), {
+      uid: data.uid,
+      email: data.email,
+      name: data.displayName ? data.displayName : name,
+      photoURL: data.photoURL ? data.photoURL : "",
+      role: "user",
+      createdAt: serverTimestamp(),
+      active: true,
+    });
+  } catch (error) {
+    toast.error(error.message);
+    throw error;
+  }
+};
 
 const Signup = () => {
   const [form, setForm] = useState({
@@ -31,26 +29,36 @@ const Signup = () => {
     password: "",
     username: "",
   });
+
   const navigate = useNavigate();
+
   const handleInputChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
+
   const signupHandler = async () => {
     if (!form.username.trim() || !form.email.trim() || !form.password.trim()) {
       return toast.error("Please fill all fields");
     }
 
-
     try {
       const response = await createUserWithEmailAndPassword(
         auth,
         form.email,
-        form.password,
+        form.password
       );
+
       if (response.user) {
-        console.log(response.user)
-        saveData(form.username,response.user)
-        toast.success("Account created succesfully");
+        await saveData(form.username, response.user);
+
+        toast.success("Account created successfully");
+
+        setForm({
+          email: "",
+          password: "",
+          username: "",
+        });
+
         setTimeout(() => {
           navigate("/login");
         }, 2000);
@@ -67,46 +75,44 @@ const Signup = () => {
       if (error.code === "auth/weak-password") {
         return toast.error("Password must be at least 6 characters");
       }
+
+      toast.error(error.message);
     }
   };
 
-      const signupWithGoogleHandler = async () => {
+  const signupWithGoogleHandler = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      let response = await signInWithPopup(auth, provider);
+      const response = await signInWithPopup(auth, provider);
+
       if (response.user) {
-        saveData("",response.user)
+        await saveData("", response.user);
+
         toast.success("Account created successfully!");
+
         setTimeout(() => {
           navigate("/");
         }, 2000);
       }
-    } catch (error) { 
+    } catch (error) {
       toast.error(error.message);
     }
   };
- 
-
-  // console.log(form);
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
-        {/* Heading */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Create Account</h1>
-
           <p className="text-gray-500 mt-2">
             Create your account and join our blog
           </p>
         </div>
 
-        {/* Username */}
         <div className="mb-5">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Username
           </label>
-
           <Input
             type={"text"}
             name={"username"}
@@ -116,7 +122,6 @@ const Signup = () => {
           />
         </div>
 
-        {/* Email */}
         <div className="mb-5">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
@@ -130,7 +135,6 @@ const Signup = () => {
           />
         </div>
 
-        {/* Password */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Password
@@ -143,14 +147,14 @@ const Signup = () => {
             value={form.password}
           />
         </div>
-        <button onClick={signupWithGoogleHandler}
+
+        <button
+          onClick={signupWithGoogleHandler}
           type="button"
-          className="w-full mb-3  cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition"
-          
+          className="w-full mb-3 cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition"
         >
           Sign Up with Google
         </button>
-        {/* Signup */}
 
         <button
           type="button"
@@ -160,18 +164,18 @@ const Signup = () => {
           Sign Up
         </button>
 
-        {/* Login */}
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{" "}
           <Link to={"/login"}>
             <button
               type="button"
-              className=" cursor-pointer text-indigo-600 font-semibold hover:underline"
+              className="cursor-pointer text-indigo-600 font-semibold hover:underline"
             >
               Login
             </button>
           </Link>
         </p>
+
         <ToastContainer />
       </div>
     </div>
@@ -179,4 +183,3 @@ const Signup = () => {
 };
 
 export default Signup;
-

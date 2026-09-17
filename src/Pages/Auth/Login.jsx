@@ -32,6 +32,11 @@ const Login = () => {
       );
       if (response.user) {
         toast.success("Login successfully");
+        setForm({
+  email: "",
+  password: "",
+  
+});
         setTimeout(() => {
           navigate("/");
         }, 2000);
@@ -63,7 +68,7 @@ const Login = () => {
 
   return (
   <>
-  <Navbar/>
+
    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         {/* Heading */}

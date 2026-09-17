@@ -1,7 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom"
 import Login from "./Pages/Auth/Login"
 import SignUp from "./Pages/Auth/SignUP"
-// import Dashboard from "./Pages/Dashboard/Dashboard"
+
 import Home from "./Pages/Home"
 
 import { ProtectedRoute } from "./components/ProtectedRoute"

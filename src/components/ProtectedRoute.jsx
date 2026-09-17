@@ -9,24 +9,16 @@ export const ProtectedRoute = ({ children }) => {
   const navigate =useNavigate()
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const getuser = () => {
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        const uid = user.id;
-        setUser(user);
-      } else {
-        setUser(null);
-      //  return toast.error("No user is signed in")
-      }
 
-      setLoading(false);
-    });
-  };
+ useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+    setLoading(false);
+    
+  },[]);
 
-  useEffect(() => {
-    getuser();
-    return () => getuser();
-  }, []);
+  return () => unsubscribe();
+}, []);
   if (loading) {
     return (
       <>

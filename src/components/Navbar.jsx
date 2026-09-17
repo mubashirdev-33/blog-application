@@ -12,13 +12,13 @@ import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import ArticleIcon from '@mui/icons-material/Article';
-import { Link, useNavigate } from 'react-router-dom'; // useNavigate add kiya redirect ke liye
+import { Link, Navigate, useNavigate } from 'react-router-dom'; // useNavigate add kiya redirect ke liye
 import { signOut } from "firebase/auth";
 import { toast, ToastContainer } from 'react-toastify';
 import { auth } from '../firebase/config.js';
 const pages = [
   { name: "Home", url: "/" },
-  { name: "Blog", url: "/blog" }
+  { name: "Your Blogs", url: "/blog" }
 ];
 
 function Navbar({userimg}) {
@@ -46,7 +46,7 @@ try {
 
   
   const settings = [
-    { name: "Profile", handler: () => { handleCloseUserMenu(); navigate('/profile'); } },
+    { name: "Profile", handler: () => { handleCloseUserMenu(); <Navigate to={"./profile"}/>; } },
     { name: "Account", handler: () => { handleCloseUserMenu(); } },
     { name: "Dashboard", handler: () => { handleCloseUserMenu(); } },
     { name: "Logout", handler: logoutHandler }, 
