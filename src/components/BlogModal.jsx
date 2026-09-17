@@ -6,13 +6,15 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../firebase/config";
 import { uploadImageToCloudinary } from "../Cloudimg/cloudimage.js";
 import { ToastContainer, toast } from "react-toastify";
-import Navbar from "./Navbar.jsx";
 
-const BlogModal = ({setBlog}) => {
-  const [open, setOpen] = React.useState(false);
+const BlogModal = ({ setBlog }) => {
+  const [open, setOpen] = useState(false);
 
   const handleOpen = () => setOpen(true);
-  const handleClose = () => setOpen(false);
+
+  const handleClose = () => {
+    setOpen(false);
+  };
 
   const [form, setForm] = useState({
     title: "",
@@ -21,36 +23,74 @@ const BlogModal = ({setBlog}) => {
   });
 
   const handleInputChange = (field, value) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const saveData = async (url, data) => {
     try {
       const userId = auth.currentUser.uid;
-      await addDoc(collection(db, "blogs"), {
+
+      const blogData = {
         blogImgUrl: url,
         title: data.title,
         description: data.description,
         authorId: userId,
         createdAt: serverTimestamp(),
-      });
+      };
+
+      const docRef = await addDoc(
+        collection(db, "blogs"),
+        blogData
+      );
+
+      return {
+        id: docRef.id,
+        ...blogData,
+      };
     } catch (error) {
       toast.error(error.message);
+      return null;
     }
   };
+
   const blogUploadFn = async () => {
     try {
+      if (!form.title || !form.description || !form.img) {
+        toast.error("Please fill all fields");
+        return;
+      }
+
       const imgURL = await uploadImageToCloudinary(form.img);
-      const save = await saveData(imgURL, form);
-    
+
+      const savedBlog = await saveData(imgURL, form);
+
+      if (savedBlog) {
+        // New blog ko existing blogs ke saath add karo
+        setBlog((prev) => [...prev, savedBlog]);
+
+        // Form reset
+        setForm({
+          title: "",
+          description: "",
+          img: "",
+        });
+
+        // Modal close
+        handleClose();
+
+        toast.success("Blog created successfully");
+      }
     } catch (error) {
-      console.log(error.message);
+      toast.error(error.message);
     }
   };
 
   return (
     <div>
-      {/* <Navbar /> */}
+      {/* Create Blog Button */}
       <div className="flex justify-end pr-6 pt-2">
         <button
           id="create-blog-btn"
@@ -61,6 +101,7 @@ const BlogModal = ({setBlog}) => {
         </button>
       </div>
 
+      {/* Modal */}
       <Modal open={open} onClose={handleClose}>
         <Box
           sx={{
@@ -80,7 +121,9 @@ const BlogModal = ({setBlog}) => {
         >
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">Create Blog</h2>
+            <h2 className="text-2xl font-bold text-gray-800">
+              Create Blog
+            </h2>
 
             <IconButton onClick={handleClose}>
               <Close />
@@ -94,7 +137,6 @@ const BlogModal = ({setBlog}) => {
             name="title"
             id="title"
             handler={handleInputChange}
-            // value={form.title}
           />
 
           {/* Description */}
@@ -102,11 +144,10 @@ const BlogModal = ({setBlog}) => {
             <Input
               type="text"
               placeholder="Write your blog description..."
-              name="description"
-              id="description"
-              handler={handleInputChange}
-              // value={form.description}
-            />
+            name="description"
+            id="description"
+            handler={handleInputChange}
+          />
           </div>
 
           {/* Image */}
@@ -118,7 +159,9 @@ const BlogModal = ({setBlog}) => {
             <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-indigo-500 transition cursor-pointer">
               <Image className="text-gray-400 text-4xl mb-2" />
 
-              <p className="text-gray-500 text-sm">Upload your blog image</p>
+              <p className="text-gray-500 text-sm">
+                Upload your blog image
+              </p>
 
               <Input
                 type="file"
@@ -148,6 +191,7 @@ const BlogModal = ({setBlog}) => {
           </Button>
         </Box>
       </Modal>
+
       <ToastContainer />
     </div>
   );

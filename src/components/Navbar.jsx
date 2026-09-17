@@ -46,7 +46,7 @@ try {
 
   
   const settings = [
-    { name: "Profile", handler: () => { handleCloseUserMenu(); <Navigate to={"./profile"}/>; } },
+    { name: "Profile", handler: () => { handleCloseUserMenu(); navigate("/profile"); } },
     { name: "Account", handler: () => { handleCloseUserMenu(); } },
     { name: "Dashboard", handler: () => { handleCloseUserMenu(); } },
     { name: "Logout", handler: logoutHandler }, 
