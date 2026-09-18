@@ -1,10 +1,14 @@
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+} from "firebase/auth";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useState } from "react";
-import Input from "../../components/Input";
-import { ToastContainer, toast } from "react-toastify";
 import { Link, useNavigate } from "react-router-dom";
+import { toast, ToastContainer } from "react-toastify";
+import Input from "../../components/Input";
 import { auth, db } from "../../firebase/config.js";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 
 export const saveData = async (name = "", data) => {
   try {
@@ -30,6 +34,9 @@ const Signup = () => {
     username: "",
   });
 
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
   const navigate = useNavigate();
 
   const handleInputChange = (field, value) => {
@@ -42,6 +49,8 @@ const Signup = () => {
     }
 
     try {
+      setLoading(true);
+
       const response = await createUserWithEmailAndPassword(
         auth,
         form.email,
@@ -65,23 +74,23 @@ const Signup = () => {
       }
     } catch (error) {
       if (error.code === "auth/email-already-in-use") {
-        return toast.error("Email already exists!");
+        toast.error("Email already exists!");
+      } else if (error.code === "auth/invalid-email") {
+        toast.error("Please enter a valid email");
+      } else if (error.code === "auth/weak-password") {
+        toast.error("Password must be at least 6 characters");
+      } else {
+        toast.error(error.message);
       }
-
-      if (error.code === "auth/invalid-email") {
-        return toast.error("Please enter a valid email");
-      }
-
-      if (error.code === "auth/weak-password") {
-        return toast.error("Password must be at least 6 characters");
-      }
-
-      toast.error(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   const signupWithGoogleHandler = async () => {
     try {
+      setGoogleLoading(true);
+
       const provider = new GoogleAuthProvider();
       const response = await signInWithPopup(auth, provider);
 
@@ -96,14 +105,20 @@ const Signup = () => {
       }
     } catch (error) {
       toast.error(error.message);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Create Account</h1>
+          <h1 className="text-3xl font-bold text-gray-800">
+            Create Account
+          </h1>
+
           <p className="text-gray-500 mt-2">
             Create your account and join our blog
           </p>
@@ -113,6 +128,7 @@ const Signup = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Username
           </label>
+
           <Input
             type={"text"}
             name={"username"}
@@ -126,6 +142,7 @@ const Signup = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
           </label>
+
           <Input
             name={"email"}
             type={"email"}
@@ -139,6 +156,7 @@ const Signup = () => {
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Password
           </label>
+
           <Input
             name={"password"}
             type={"password"}
@@ -151,17 +169,33 @@ const Signup = () => {
         <button
           onClick={signupWithGoogleHandler}
           type="button"
-          className="w-full mb-3 cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition"
+          disabled={loading || googleLoading}
+          className="w-full mb-3 cursor-pointer bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
         >
-          Sign Up with Google
+          {googleLoading ? (
+            <>
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              Signing up...
+            </>
+          ) : (
+            "Sign Up with Google"
+          )}
         </button>
 
         <button
           type="button"
-          className="w-full cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition"
           onClick={signupHandler}
+          disabled={loading || googleLoading}
+          className="w-full cursor-pointer bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
         >
-          Sign Up
+          {loading ? (
+            <>
+              <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              Signing up...
+            </>
+          ) : (
+            "Sign Up"
+          )}
         </button>
 
         <p className="text-center text-sm text-gray-500 mt-6">

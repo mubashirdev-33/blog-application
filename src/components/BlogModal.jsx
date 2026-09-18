@@ -1,26 +1,73 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Box, Button, IconButton } from "@mui/material";
 import { Close, Image } from "@mui/icons-material";
 import Input from "../components/Input";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { auth, db } from "../firebase/config";
 import { uploadImageToCloudinary } from "../Cloudimg/cloudimage.js";
 import { ToastContainer, toast } from "react-toastify";
 
-const BlogModal = ({ setBlog }) => {
+const BlogModal = ({
+  setBlog,
+  editBlog,
+  setEditBlog,
+  onBlogUpdated,
+}) => {
   const [open, setOpen] = useState(false);
-
-  const handleOpen = () => setOpen(true);
-
-  const handleClose = () => {
-    setOpen(false);
-  };
+  const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
     description: "",
     img: "",
   });
+
+  useEffect(() => {
+    if (editBlog) {
+      setForm({
+        title: editBlog.title || "",
+        description: editBlog.description || "",
+        img: "",
+      });
+
+      setOpen(true);
+    }
+  }, [editBlog]);
+
+  const handleOpen = () => {
+    setForm({
+      title: "",
+      description: "",
+      img: "",
+    });
+
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    if (loading) {
+      return;
+    }
+
+    setOpen(false);
+
+    setForm({
+      title: "",
+      description: "",
+      img: "",
+    });
+
+    if (setEditBlog) {
+      setEditBlog(null);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     setForm((prev) => ({
@@ -31,13 +78,33 @@ const BlogModal = ({ setBlog }) => {
 
   const saveData = async (url, data) => {
     try {
+      if (!auth.currentUser) {
+        toast.error("Please login first");
+        return null;
+      }
+
       const userId = auth.currentUser.uid;
+
+      const userRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userRef);
+
+      let authorName = auth.currentUser.displayName || "User";
+      let authorPhoto = auth.currentUser.photoURL || "";
+
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+
+        authorName = userData.name || authorName;
+        authorPhoto = userData.photoURL || authorPhoto;
+      }
 
       const blogData = {
         blogImgUrl: url,
         title: data.title,
         description: data.description,
         authorId: userId,
+        authorName: authorName,
+        authorPhoto: authorPhoto,
         createdAt: serverTimestamp(),
       };
 
@@ -56,53 +123,121 @@ const BlogModal = ({ setBlog }) => {
     }
   };
 
-  const blogUploadFn = async () => {
+  const createBlog = async () => {
     try {
-      if (!form.title || !form.description || !form.img) {
+      if (
+        !form.title.trim() ||
+        !form.description.trim() ||
+        !form.img
+      ) {
         toast.error("Please fill all fields");
         return;
       }
+
+      setLoading(true);
 
       const imgURL = await uploadImageToCloudinary(form.img);
 
       const savedBlog = await saveData(imgURL, form);
 
       if (savedBlog) {
-        // New blog ko existing blogs ke saath add karo
         setBlog((prev) => [...prev, savedBlog]);
 
-        // Form reset
         setForm({
           title: "",
           description: "",
           img: "",
         });
 
-        // Modal close
-        handleClose();
+        setOpen(false);
 
         toast.success("Blog created successfully");
       }
     } catch (error) {
+      console.log(error.message);
       toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateBlog = async () => {
+    try {
+      if (!editBlog) {
+        return;
+      }
+
+      if (!form.title.trim() || !form.description.trim()) {
+        toast.error("Please fill all fields");
+        return;
+      }
+
+      if (!auth.currentUser) {
+        toast.error("Please login first");
+        return;
+      }
+
+      setLoading(true);
+
+      const blogRef = doc(db, "blogs", editBlog.id);
+
+      let imageURL = editBlog.blogImgUrl;
+
+      if (form.img) {
+        imageURL = await uploadImageToCloudinary(form.img);
+      }
+
+      const updatedData = {
+        blogImgUrl: imageURL,
+        title: form.title,
+        description: form.description,
+      };
+
+      await updateDoc(blogRef, updatedData);
+
+      const updatedBlog = {
+        ...editBlog,
+        ...updatedData,
+      };
+
+      onBlogUpdated(updatedBlog);
+
+      setForm({
+        title: "",
+        description: "",
+        img: "",
+      });
+
+      setOpen(false);
+
+      setEditBlog(null);
+
+      toast.success("Blog updated successfully");
+    } catch (error) {
+      console.log(error.message);
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div>
-      {/* Create Blog Button */}
       <div className="flex justify-end pr-6 pt-2">
         <button
           id="create-blog-btn"
           onClick={handleOpen}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-lg font-semibold transition cursor-pointer"
+          disabled={loading}
+          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white px-5 py-3 rounded-lg font-semibold transition cursor-pointer flex items-center gap-2"
         >
           Create a Blog
         </button>
       </div>
 
-      {/* Modal */}
-      <Modal open={open} onClose={handleClose}>
+      <Modal
+        open={open}
+        onClose={handleClose}
+      >
         <Box
           sx={{
             position: "absolute",
@@ -119,48 +254,57 @@ const BlogModal = ({ setBlog }) => {
             p: 4,
           }}
         >
-          {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-800">
-              Create Blog
+              {editBlog ? "Edit Blog" : "Create Blog"}
             </h2>
 
-            <IconButton onClick={handleClose}>
+            <IconButton
+              onClick={handleClose}
+              disabled={loading}
+            >
               <Close />
             </IconButton>
           </div>
 
-          {/* Title */}
           <Input
             type="text"
             placeholder="Enter blog title"
             name="title"
             id="title"
             handler={handleInputChange}
+            value={form.title}
           />
 
-          {/* Description */}
           <div className="mt-3">
-            <Input
-              type="text"
+            <textarea
+              name="description"
+              id="description"
               placeholder="Write your blog description..."
-            name="description"
-            id="description"
-            handler={handleInputChange}
-          />
+              value={form.description}
+              onChange={(e) =>
+                handleInputChange(
+                  "description",
+                  e.target.value
+                )
+              }
+              className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none overflow-y-auto text-gray-700 placeholder-gray-400"
+            />
           </div>
 
-          {/* Image */}
           <div className="mb-5 mt-3">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Blog Image
             </label>
 
             <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center hover:border-indigo-500 transition cursor-pointer">
+
               <Image className="text-gray-400 text-4xl mb-2" />
 
-              <p className="text-gray-500 text-sm">
-                Upload your blog image
+              <p className="text-gray-500 text-sm mb-3">
+                {editBlog
+                  ? "Upload new image or keep existing image"
+                  : "Upload your blog image"}
               </p>
 
               <Input
@@ -173,12 +317,12 @@ const BlogModal = ({ setBlog }) => {
             </div>
           </div>
 
-          {/* Create Button */}
           <Button
-            onClick={blogUploadFn}
+            onClick={editBlog ? updateBlog : createBlog}
             variant="contained"
             fullWidth
             size="large"
+            disabled={loading}
             sx={{
               py: 1.5,
               borderRadius: "10px",
@@ -187,7 +331,19 @@ const BlogModal = ({ setBlog }) => {
               fontWeight: 600,
             }}
           >
-            Create Blog
+            {loading ? (
+              <span className="flex items-center justify-center gap-2">
+                <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+
+                {editBlog
+                  ? "Updating Blog..."
+                  : "Creating Blog..."}
+              </span>
+            ) : editBlog ? (
+              "Update Blog"
+            ) : (
+              "Create Blog"
+            )}
           </Button>
         </Box>
       </Modal>

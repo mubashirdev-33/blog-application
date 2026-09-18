@@ -1,9 +1,26 @@
 import React, { useEffect, useState } from "react";
-import { Box, Modal, TextField, Button, Avatar, IconButton } from "@mui/material";
-import { Person, Email, Phone, LocationOn, Work, CalendarMonth, Edit, CameraAlt, Close } from "@mui/icons-material";
+import {
+  Box,
+  Modal,
+  TextField,
+  Button,
+  Avatar,
+  IconButton,
+} from "@mui/material";
+import {
+  Person,
+  Email,
+  Phone,
+  LocationOn,
+  Work,
+  CalendarMonth,
+  Edit,
+  CameraAlt,
+  Close,
+} from "@mui/icons-material";
 import Navbar from "../components/Navbar";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, getDocs, query, where, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../firebase/config.js";
 import { toast, ToastContainer } from "react-toastify";
 import { uploadImageToCloudinary } from "../Cloudimg/cloudimage.js";
@@ -13,9 +30,10 @@ const Profile = () => {
   const [image, setImage] = useState("");
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [form, setForm] = useState({
     name: "",
-    email: "",
     phone: "",
     profession: "",
     location: "",
@@ -23,6 +41,11 @@ const Profile = () => {
   });
 
   const handleEdit = () => {
+    if (!user) {
+      toast.error("User data not found");
+      return;
+    }
+
     setForm({
       name: user.name || "",
       phone: user.phone || "",
@@ -30,6 +53,7 @@ const Profile = () => {
       location: user.location || "",
       bio: user.bio || "",
     });
+
     setImage("");
     setOpen(true);
   };
@@ -43,6 +67,7 @@ const Profile = () => {
 
   const handleImageChange = (event) => {
     const file = event.target.files[0];
+
     if (file) {
       setImage(file);
     }
@@ -51,19 +76,24 @@ const Profile = () => {
   const getCurrentUser = async (currentUser) => {
     try {
       setLoading(true);
-      const q = query(
-        collection(db, "users"),
-        where("email", "==", currentUser.email)
-      );
-      const querySnapshot = await getDocs(q);
 
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        const userData = userDoc.data();
-        setUser(userData);
+      const userRef = doc(db, "users", currentUser.uid);
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        setUser(null);
+        toast.error("User profile not found");
+        return;
       }
+
+      setUser({
+        id: userDoc.id,
+        ...userDoc.data(),
+      });
     } catch (error) {
-      console.log("Error:", error);
+      console.log("Get Profile Error:", error);
+      toast.error(error.message);
+      setUser(null);
     } finally {
       setLoading(false);
     }
@@ -71,48 +101,58 @@ const Profile = () => {
 
   const handleSave = async () => {
     try {
-      const q = query(
-        collection(db, "users"),
-        where("email", "==", user.email)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        let imageURL = user.photoURL || "";
-
-        if (image) {
-          imageURL = await uploadImageToCloudinary(image);
-        }
-
-        await updateDoc(userDoc.ref, {
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
-          profession: form.profession,
-          location: form.location,
-          bio: form.bio,
-          photoURL: imageURL,
-        });
-
-        setUser({
-          ...user,
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
-          profession: form.profession,
-          location: form.location,
-          bio: form.bio,
-          photoURL: imageURL,
-        });
-
-        setImage("");
-        setOpen(false);
-        toast.success("Profile updated successfully");
+      if (!auth.currentUser) {
+        toast.error("User is not logged in");
+        return;
       }
+
+      if (!form.name.trim()) {
+        toast.error("Please enter your name");
+        return;
+      }
+
+      setSaving(true);
+
+      const userRef = doc(db, "users", auth.currentUser.uid);
+
+      const userDoc = await getDoc(userRef);
+
+      if (!userDoc.exists()) {
+        toast.error("User profile not found");
+        return;
+      }
+
+      let imageURL = user.photoURL || "";
+
+      if (image) {
+        imageURL = await uploadImageToCloudinary(image);
+      }
+
+      const updatedData = {
+        name: form.name,
+        phone: form.phone,
+        profession: form.profession,
+        location: form.location,
+        bio: form.bio,
+        photoURL: imageURL,
+      };
+
+      await updateDoc(userRef, updatedData);
+
+      setUser({
+        ...user,
+        ...updatedData,
+      });
+
+      setImage("");
+      setOpen(false);
+
+      toast.success("Profile updated successfully");
     } catch (error) {
-      console.log("Error:", error);
-      toast.error("Something went wrong");
+      console.log("Update Profile Error:", error);
+      toast.error(error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -133,9 +173,9 @@ const Profile = () => {
     <div className="min-h-screen bg-slate-50">
       <Navbar
         userimg={
-          user?.photoURL
+          user && user.photoURL
             ? user.photoURL
-            : user?.name
+            : user && user.name
             ? user.name.charAt(0).toUpperCase()
             : ""
         }
@@ -167,7 +207,11 @@ const Profile = () => {
                 <h1 className="text-3xl font-bold text-slate-800">
                   {user.name || "User"}
                 </h1>
-                <p className="text-slate-500 mt-1">{user.email}</p>
+
+                <p className="text-slate-500 mt-1">
+                  {user.email}
+                </p>
+
                 <p className="text-indigo-600 mt-2">
                   {user.profession || "Frontend Developer"}
                 </p>
@@ -193,7 +237,9 @@ const Profile = () => {
                 <Person className="text-indigo-600" />
                 <div>
                   <p className="text-sm text-slate-400">Full Name</p>
-                  <p className="text-slate-700">{user.name || "Not added"}</p>
+                  <p className="text-slate-700">
+                    {user.name || "Not added"}
+                  </p>
                 </div>
               </div>
 
@@ -201,7 +247,9 @@ const Profile = () => {
                 <Email className="text-indigo-600" />
                 <div>
                   <p className="text-sm text-slate-400">Email</p>
-                  <p className="text-slate-700">{user.email || "Not added"}</p>
+                  <p className="text-slate-700">
+                    {user.email || "Not added"}
+                  </p>
                 </div>
               </div>
 
@@ -209,7 +257,9 @@ const Profile = () => {
                 <Phone className="text-indigo-600" />
                 <div>
                   <p className="text-sm text-slate-400">Phone</p>
-                  <p className="text-slate-700">{user.phone || "Not added"}</p>
+                  <p className="text-slate-700">
+                    {user.phone || "Not added"}
+                  </p>
                 </div>
               </div>
 
@@ -217,7 +267,9 @@ const Profile = () => {
                 <Work className="text-indigo-600" />
                 <div>
                   <p className="text-sm text-slate-400">Profession</p>
-                  <p className="text-slate-700">{user.profession || "Not added"}</p>
+                  <p className="text-slate-700">
+                    {user.profession || "Not added"}
+                  </p>
                 </div>
               </div>
 
@@ -225,7 +277,9 @@ const Profile = () => {
                 <LocationOn className="text-indigo-600" />
                 <div>
                   <p className="text-sm text-slate-400">Location</p>
-                  <p className="text-slate-700">{user.location || "Not added"}</p>
+                  <p className="text-slate-700">
+                    {user.location || "Not added"}
+                  </p>
                 </div>
               </div>
 
@@ -247,6 +301,7 @@ const Profile = () => {
             <h2 className="text-xl font-semibold text-slate-800 mb-3">
               About Me
             </h2>
+
             <p className="text-slate-600 leading-7">
               {user.bio || "No biography added yet."}
             </p>
@@ -256,6 +311,7 @@ const Profile = () => {
             <h2 className="text-xl font-semibold text-slate-800 mb-3">
               Profile Status
             </h2>
+
             <span className="inline-block px-4 py-2 rounded-full bg-green-100 text-green-700">
               {user.active ? "Active" : "Inactive"}
             </span>
@@ -263,11 +319,20 @@ const Profile = () => {
         </main>
       ) : (
         <div className="min-h-[80vh] flex items-center justify-center">
-          <p className="text-slate-500">User not found</p>
+          <p className="text-slate-500">
+            User not found
+          </p>
         </div>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)}>
+      <Modal
+        open={open}
+        onClose={() => {
+          if (!saving) {
+            setOpen(false);
+          }
+        }}
+      >
         <Box
           sx={{
             position: "absolute",
@@ -282,8 +347,14 @@ const Profile = () => {
           }}
         >
           <div className="flex justify-between items-center mb-5">
-            <h2 className="text-2xl font-bold">Edit Profile</h2>
-            <IconButton onClick={() => setOpen(false)}>
+            <h2 className="text-2xl font-bold">
+              Edit Profile
+            </h2>
+
+            <IconButton
+              onClick={() => setOpen(false)}
+              disabled={saving}
+            >
               <Close />
             </IconButton>
           </div>
@@ -294,7 +365,9 @@ const Profile = () => {
                 src={
                   image
                     ? URL.createObjectURL(image)
-                    : user?.photoURL || ""
+                    : user && user.photoURL
+                    ? user.photoURL
+                    : ""
                 }
                 sx={{
                   width: 100,
@@ -303,7 +376,9 @@ const Profile = () => {
                   backgroundColor: "#4f46e5",
                 }}
               >
-                {!image && !user?.photoURL && form.name
+                {!image &&
+                !(user && user.photoURL) &&
+                form.name
                   ? form.name.charAt(0).toUpperCase()
                   : ""}
               </Avatar>
@@ -380,8 +455,9 @@ const Profile = () => {
               variant="contained"
               fullWidth
               onClick={handleSave}
+              disabled={saving}
             >
-              Save Changes
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </Box>
